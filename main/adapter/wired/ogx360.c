@@ -46,7 +46,6 @@ struct usbd_duke_t data;
 
 
 void IRAM_ATTR ogx360_init_buffer(int32_t dev_mode, struct wired_data *wired_data) {
-    return;
     memset(&data,0,sizeof(struct usbd_duke_t));
 }
 
@@ -55,7 +54,6 @@ void ogx360_meta_init(struct generic_ctrl *ctrl_data) {
 }
 
 void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
-	return;
 	memset(&data,0,sizeof(data));
 	data.out.startByte = 0xF1;
 	data.out.bLength = sizeof(data.out);

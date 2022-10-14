@@ -49,7 +49,7 @@ static from_generic_t from_generic_func[WIRED_MAX] = {
     para_1p_from_generic, /* PARALLEL_1P_OD */
     para_2p_from_generic, /* PARALLEL_2P_OD */
     sea_from_generic, /* SEA_BOARD */
-    NULL,//ogx360_from_generic, /* OGX360 */
+    ogx360_from_generic, /* OGX360 */
 };
 
 static fb_to_generic_t fb_to_generic_func[WIRED_MAX] = {
