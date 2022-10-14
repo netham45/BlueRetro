@@ -61,8 +61,8 @@ static DRAM_ATTR const struct ctrl_meta ogx360_axes_meta[ADAPTER_MAX_AXES] =
     {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
     {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
     {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
-    {.size_min = 0, .size_max = 255, .neutral = 0x16, .abs_max = 0xDA},
-    {.size_min = 0, .size_max = 255, .neutral = 0x16, .abs_max = 0xDA},
+    {.size_min = 0, .size_max = 255, .neutral = 0x00, .abs_max = 255},
+    {.size_min = 0, .size_max = 255, .neutral = 0x00, .abs_max = 255},
 };
 
 struct ogx360_map {
@@ -73,11 +73,13 @@ struct ogx360_map {
 /*static DRAM_ATTR const uint8_t ogx360_axes_idx[ADAPTER_MAX_AXES] =
 {
 //  AXIS_LX, AXIS_LY, AXIS_RX, AXIS_RY, TRIG_L, TRIG_R
-    0,       2,       1,       3,       4,      5
+    0,       1,       2,       3,       4,      5
 };*/
 
-static const uint32_t ogx360_mask[4] = {0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000};
-static const uint32_t ogx360_pro_desc[4] = {0x000000FF, 0x00000000, 0x00000000, 0x00000000};
+//static const uint32_t ogx360_mask[4] = {0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000};
+//static const uint32_t ogx360_desc[4] = {0x110000FF, 0x00000000, 0x00000000, 0x00000000};
+
+static const uint32_t ogx360_mask[4] = {0xBBFF0FFF, 0x00000000, 0x00000000, 0x00000000};
 static const uint32_t ogx360_desc[4] = {0x110000FF, 0x00000000, 0x00000000, 0x00000000};
 
 
@@ -134,7 +136,7 @@ void ogx360_meta_init(struct generic_ctrl *ctrl_data) {
                     break;
                 default:
                     ctrl_data[i].mask = ogx360_mask;
-                    ctrl_data[i].desc = ogx360_pro_desc;
+                    ctrl_data[i].desc = ogx360_desc;
                     ctrl_data[i].axes[j].meta = &ogx360_axes_meta[j];
                     break;
             }
@@ -164,24 +166,25 @@ void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struc
 		i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
 	}
 	memset(&data,0,sizeof(data));
+	
 	data.out.startByte = 0xF1;
 	data.out.bLength = sizeof(data.out);
-	if (ctrl_data->btns[0].value & BIT(11)) data.out.wButtons |= BIT(0);
-	if (ctrl_data->btns[0].value & BIT(10)) data.out.wButtons |= BIT(1);
-	if (ctrl_data->btns[0].value & BIT(8)) data.out.wButtons |= BIT(2);
-	if (ctrl_data->btns[0].value & BIT(9)) data.out.wButtons |= BIT(3);
-	if (ctrl_data->btns[0].value & BIT(20)) data.out.wButtons |= BIT(4);
-	if (ctrl_data->btns[0].value & BIT(21)) data.out.wButtons |= BIT(5);
-	if (ctrl_data->btns[0].value & BIT(26)) data.out.wButtons |= BIT(6);
-	if (ctrl_data->btns[0].value & BIT(30)) data.out.wButtons |= BIT(7);
-	data.out.A |= (ctrl_data->btns[0].value & BIT(18)) > 0 ? 0xFF : 0;
-	data.out.B |= (ctrl_data->btns[0].value & BIT(17)) > 0 ? 0xFF : 0;
-	data.out.X |= (ctrl_data->btns[0].value & BIT(16)) > 0 ? 0xFF : 0;
-	data.out.Y |= (ctrl_data->btns[0].value & BIT(19)) > 0 ? 0xFF : 0;
-	data.out.WHITE |= (ctrl_data->btns[0].value & BIT(29)) > 0 ? 0xFF : 0;
-	data.out.BLACK |= (ctrl_data->btns[0].value & BIT(25)) > 0 ? 0xFF : 0;
-
-	for (int i=0;i<6;i++)
+	if (ctrl_data->btns[0].value & BIT(11)) data.out.wButtons |= BIT(0); // D-Up
+	if (ctrl_data->btns[0].value & BIT(10)) data.out.wButtons |= BIT(1); // D-Down
+	if (ctrl_data->btns[0].value & BIT(8)) data.out.wButtons |= BIT(2);  // D-Left
+	if (ctrl_data->btns[0].value & BIT(9)) data.out.wButtons |= BIT(3);  // D-Right
+	if (ctrl_data->btns[0].value & BIT(20)) data.out.wButtons |= BIT(4); // Start
+	if (ctrl_data->btns[0].value & BIT(21)) data.out.wButtons |= BIT(5); // Back
+	if (ctrl_data->btns[0].value & BIT(27)) data.out.wButtons |= BIT(6); // L Stick Press
+	if (ctrl_data->btns[0].value & BIT(31)) data.out.wButtons |= BIT(7); // R Stick Press
+	data.out.A |= (ctrl_data->btns[0].value & BIT(18)) > 0 ? 0xFF : 0; // A
+	data.out.B |= (ctrl_data->btns[0].value & BIT(17)) > 0 ? 0xFF : 0; // B
+	data.out.X |= (ctrl_data->btns[0].value & BIT(16)) > 0 ? 0xFF : 0; // X
+	data.out.Y |= (ctrl_data->btns[0].value & BIT(19)) > 0 ? 0xFF : 0; // Y
+	data.out.WHITE |= (ctrl_data->btns[0].value & BIT(29)) > 0 ? 0xFF : 0;  // White
+	data.out.BLACK |= (ctrl_data->btns[0].value & BIT(25)) > 0 ? 0xFF : 0;  // Black
+	int ltrigger = -1;
+	for (int i=0;i<ADAPTER_MAX_AXES;i++)
 	{
 		int16_t result = 0;
 		//if (ctrl_data->btns[i].value & (axis_to_btn_mask(0))) {
@@ -202,16 +205,17 @@ void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struc
 				data.out.rightStickY = result;
 				break;
 			case 4:
-				data.out.L = result / 255;
+				ltrigger = result;
+				data.out.L = result;
 				break;
-			case 5:
-				data.out.R = result / 255;
+			case 5:			
+				data.out.R = result;
 				break;
 		}
 	}
-	memcpy(wired_data->output, (void *)&data, sizeof(data));
-
-	i2c_master_write_to_device(I2C_NUM_0, 1, &data, sizeof(data), 1000);
+	memcpy(wired_data->output, (void *)&data.out, sizeof(data.out));
+	ets_printf("L Trigger: %d\n",ltrigger);
+	i2c_master_write_to_device(I2C_NUM_0, ctrl_data->index+1, (void*)&data.out, sizeof(data.out), 1000);
 }
 
 void ogx360_gen_turbo_mask(struct wired_data *wired_data) {
