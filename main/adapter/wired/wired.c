@@ -105,7 +105,7 @@ static meta_init_t meta_init_func[WIRED_MAX] = {
     para_1p_meta_init, /* PARALLEL_1P_OD */
     para_2p_meta_init, /* PARALLEL_2P_OD */
     sea_meta_init, /* SEA_BOARD */
-    NULL, /* OGX360 */
+    ogx360_meta_init, /* OGX360 */
 };
 
 static DRAM_ATTR buffer_init_t buffer_init_func[WIRED_MAX] = {

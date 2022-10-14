@@ -30,10 +30,7 @@
 
 void i2c_write(unsigned char* data, uint32_t len, uint8_t port)
 {
-	WRITE_PERI_REG(FIFO_ADDR, port);
-    for (uint32_t i = 0; i < len; i++) {
-        WRITE_PERI_REG(FIFO_ADDR, data[i]);
-    }
+	i2c_master_write_to_device(I2C_NUM_0,port,data,len,10000);
 }
 
 void ogx360_send_data()
@@ -58,12 +55,15 @@ void ogx360_loop()
 	while(1)
 	{
 		ogx360_send_data();
-		delay_us(5);
+		delay_us(5000);
 	}
 }
 
 void ogx360_init(void)
 {
+
+	
+	#if 0
 		ets_printf("ogx360_init_1\n");
         /* Data */
         gpio_set_level_iram(SDA_PIN, 1);
@@ -107,5 +107,6 @@ void ogx360_init(void)
 		ets_printf("ogx360_init_7\n");
 		intexc_alloc_iram(ETS_I2C_EXT0_INTR_SOURCE, I2C0_INTR_NUM, ogx360_i2c_isr);
 		ets_printf("ogx360_init_8\n");
+		#endif
 		ogx360_loop();
 }

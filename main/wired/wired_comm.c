@@ -76,7 +76,7 @@ static const wired_init_t wired_init[WIRED_MAX] = {
     parallel_io_init, /* PARALLEL_1P_OD */
     parallel_io_init, /* PARALLEL_2P_OD */
     sea_init, /* SEA_BOARD */
-	ogx360_init, /* OGX360 */
+	NULL, //ogx360_init, /* OGX360 */
 };
 
 static const wired_port_cfg_t wired_port_cfg[WIRED_MAX] = {
