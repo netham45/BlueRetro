@@ -41,6 +41,7 @@ static void wired_init_task(void) {
 #else
     wired_adapter.system_id = HARDCODED_SYS;
     ets_printf("# Hardcoded system : %d: %s\n", wired_adapter.system_id, wired_get_sys_name());
+	ets_printf("Is this even compiling the new code?\n");
 #endif
 
     while (config.magic != CONFIG_MAGIC) {
@@ -51,14 +52,15 @@ static void wired_init_task(void) {
         wired_adapter.system_id = config.global_cfg.system_cfg;
         ets_printf("# Config override system : %d: %s\n", wired_adapter.system_id, wired_get_sys_name());
     }
-
+	ets_printf("adapter_init_buffer()\n");
     for (uint32_t i = 0; i < WIRED_MAX_DEV; i++) {
         adapter_init_buffer(i);
     }
-
+ets_printf("wired_comm_init()");
     if (wired_adapter.system_id < WIRED_MAX) {
         wired_comm_init();
     }
+	ets_printf("return on wired_init_task\n");
 }
 
 static void wl_init_task(void *arg) {

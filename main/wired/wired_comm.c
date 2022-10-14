@@ -2,7 +2,6 @@
  * Copyright (c) 2021-2022, Jacques Gagnon
  * SPDX-License-Identifier: Apache-2.0
  */
-
 #include <stddef.h>
 #include "npiso_io.h"
 #include "cdi_uart.h"
@@ -18,6 +17,7 @@
 #include "jag_io.h"
 #include "sea_io.h"
 #include "wii_i2c.h"
+#include "ogx360_i2c.h"
 #include "adapter/adapter.h"
 
 typedef void (*wired_init_t)(void);
@@ -48,6 +48,7 @@ static const char *sys_name[WIRED_MAX] = {
     "PARALLEL_1P_OD",
     "PARALLEL_2P_OD",
     "SEA Board",
+	"OGX360",
 };
 
 static const wired_init_t wired_init[WIRED_MAX] = {
@@ -75,6 +76,7 @@ static const wired_init_t wired_init[WIRED_MAX] = {
     parallel_io_init, /* PARALLEL_1P_OD */
     parallel_io_init, /* PARALLEL_2P_OD */
     sea_init, /* SEA_BOARD */
+	ogx360_init, /* OGX360 */
 };
 
 static const wired_port_cfg_t wired_port_cfg[WIRED_MAX] = {
@@ -102,6 +104,7 @@ static const wired_port_cfg_t wired_port_cfg[WIRED_MAX] = {
     NULL, /* PARALLEL_1P_OD */
     NULL, /* PARALLEL_2P_OD */
     NULL, /* SEA_BOARD */
+	NULL, /* OGX360 */
 };
 
 void wired_comm_init(void) {

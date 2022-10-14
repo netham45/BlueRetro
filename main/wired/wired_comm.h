@@ -71,6 +71,10 @@
 #else
 #ifdef CONFIG_BLUERETRO_SYSTEM_SEA_BOARD
 #define HARDCODED_SYS SEA_BOARD
+#else
+#ifdef CONFIG_BLUERETRO_SYSTEM_OGX360
+#define HARDCODED_SYS OGX360
+#endif
 #endif
 #endif
 #endif

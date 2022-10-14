@@ -81,6 +81,7 @@ enum {
     PARALLEL_1P_OD,
     PARALLEL_2P_OD,
     SEA_BOARD,
+    OGX360,
     WIRED_MAX,
 };
 
