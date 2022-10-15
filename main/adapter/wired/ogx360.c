@@ -57,7 +57,7 @@ static const uint32_t ogx360_desc[4] = {0x110000FF, 0x00000000, 0x00000000, 0x00
 /*Start ogx360_i2c.c*/
 typedef struct __attribute__((packed)) usbd_duke_out
 {
-	uint8_t controllerType;
+    uint8_t controllerType;
     uint8_t startByte;
     uint8_t bLength;
     uint16_t wButtons;
@@ -91,12 +91,12 @@ void initialize_i2c() {
         };
         i2c_param_config(I2C_NUM_0, &conf);
         i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
-		const char ping[] = { 0xAA };
-		i2c_master_write_to_device(I2C_NUM_0, 1, (void*)ping, 1, 1000);
-		i2c_master_write_to_device(I2C_NUM_0, 2, (void*)ping, 1, 1000);
-		i2c_master_write_to_device(I2C_NUM_0, 3, (void*)ping, 1, 1000);
-		i2c_master_write_to_device(I2C_NUM_0, 4, (void*)ping, 1, 1000);
-	}
+        const char ping[] = { 0xAA };
+        i2c_master_write_to_device(I2C_NUM_0, 1, (void*)ping, 1, 1000);
+        i2c_master_write_to_device(I2C_NUM_0, 2, (void*)ping, 1, 1000);
+        i2c_master_write_to_device(I2C_NUM_0, 3, (void*)ping, 1, 1000);
+        i2c_master_write_to_device(I2C_NUM_0, 4, (void*)ping, 1, 1000);
+    }
 }
 /*End ogx360_i2c.c*/
 
@@ -123,9 +123,9 @@ void ogx360_meta_init(struct generic_ctrl *ctrl_data) {
 
 void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
     initialize_i2c(); // ogx360_i2c.c
-	struct usbd_duke_out duke_out = { 0 }; // ogx360_i2c.c
+    struct usbd_duke_out duke_out = { 0 }; // ogx360_i2c.c
     struct usbd_duke_in duke_in = { 0 }; // ogx360_i2c.c
-	
+    
     duke_out.controllerType = 0xF1;
     duke_out.startByte = 0;
     duke_out.bLength = 6; // Always needs to be 6 according to docs
@@ -161,13 +161,13 @@ void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struc
     {
         duke_out.axis16[i] = ctrl_data->axes[i].value;
     }
-	
+    
     for (int i=0;i<NUM_8BIT_AXIS;i++) // 8 bit axis
     {
         duke_out.axis8[i] = ctrl_data->axes[i + NUM_16BIT_AXIS].value;
     }
     memcpy(wired_data->output, (void *)&duke_out, sizeof(duke_out));
-	
-	i2c_master_write_to_device(I2C_NUM_0, ctrl_data->index+1, (void*)&duke_out, sizeof(duke_out), 250); // ogx360_i2c.c
-	i2c_master_read_from_device(I2C_NUM_0,ctrl_data->index+1, (void*)&duke_in, sizeof(duke_in), 250); // ogx360_i2c.c
+    
+    i2c_master_write_to_device(I2C_NUM_0, ctrl_data->index+1, (void*)&duke_out, sizeof(duke_out), 250); // ogx360_i2c.c
+    i2c_master_read_from_device(I2C_NUM_0,ctrl_data->index+1, (void*)&duke_in, sizeof(duke_in), 250); // ogx360_i2c.c
 }
