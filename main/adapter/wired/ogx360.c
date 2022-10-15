@@ -1,127 +1,93 @@
-/*
- * Copyright (c) 2019-2022, Jacques Gagnon
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#include <string.h>
-#include "adapter/config.h"
-#include "zephyr/types.h"
-#include "tools/util.h"
 #include "ogx360.h"
-#include "soc/io_mux_reg.h"
-#include "esp_private/periph_ctrl.h"
-#include <soc/i2c_periph.h>
-#include <esp32/rom/ets_sys.h>
-#include <esp32/rom/gpio.h>
-#include "hal/i2c_ll.h"
-#include "hal/clk_gate_ll.h"
-#include "hal/misc.h"
-#include "driver/gpio.h"
-#include "driver/i2c.h"
-#include "system/intr.h"
-#include "system/gpio.h"
-#include "system/delay.h"
-#include "zephyr/atomic.h"
-#include "zephyr/types.h"
-#include "tools/util.h"
-#include "adapter/adapter.h"
-#include "adapter/config.h"
 
-enum {
-	OGX360_D_UP,
-	OGX360_D_DOWN,
-	OGX360_D_LEFT,
-	OGX360_D_RIGHT,
-	OGX360_START,
-	OGX360_BACK,
-	OGX360_WHITE,
-	OGX360_BLACK,
-	OGX360_A,
-	OGX360_B,
-	OGX360_X,
-	OGX360_Y,
-	OGX360_L,
-	OGX360_R,
+enum { // Digital buttons
+    OGX360_D_UP,
+    OGX360_D_DOWN,
+    OGX360_D_LEFT,
+    OGX360_D_RIGHT,
+    OGX360_START,
+    OGX360_BACK,
+    OGX360_LSTICK,
+    OGX360_RSTICK
 };
 
-/*static DRAM_ATTR const uint32_t ogx360_btns_mask[32] = {
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    BIT(OGX360_D_LEFT), BIT(OGX360_D_RIGHT), BIT(OGX360_D_DOWN), BIT(OGX360_D_UP),
-    0, 0, 0, 0,
-    BIT(OGX360_X), BIT(OGX360_B), BIT(OGX360_A), BIT(OGX360_Y),
-    BIT(OGX360_START), BIT(OGX360_BACK), 0, 0,
-    BIT(OGX360_L), BIT(OGX360_BLACK), BIT(OGX360_L), 0,
-    BIT(OGX360_R), BIT(OGX360_WHITE), BIT(OGX360_R), 0,
-};*/
+enum { // Analog buttons
+    OGX360_A,
+    OGX360_B,
+    OGX360_X,
+    OGX360_Y,
+    OGX360_BLACK,
+    OGX360_WHITE,
+};
+
+static DRAM_ATTR const int ogx360_digital_btns_mask[BUTTON_MASK_SIZE] = {
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    OGX360_D_LEFT, OGX360_D_RIGHT, OGX360_D_DOWN, OGX360_D_UP,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    OGX360_START, OGX360_BACK, -1, -1,
+    -1, -1, -1, OGX360_LSTICK,
+    -1, -1, -1, OGX360_RSTICK
+};
+
+static DRAM_ATTR const int ogx360_analog_btns_mask[BUTTON_MASK_SIZE] = {
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    OGX360_X, OGX360_B, OGX360_A, OGX360_Y,
+    -1, -1, -1, -1,
+    -1, OGX360_BLACK, -1, -1,
+    -1, OGX360_WHITE, -1, -1,
+};
 
 static DRAM_ATTR const struct ctrl_meta ogx360_axes_meta[ADAPTER_MAX_AXES] =
 {
-    {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
-    {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
-    {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
-    {.size_min = -128, .size_max = 127, .neutral = 0x80, .abs_max = 0x66},
+    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
+    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
+    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
+    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
     {.size_min = 0, .size_max = 255, .neutral = 0x00, .abs_max = 255},
     {.size_min = 0, .size_max = 255, .neutral = 0x00, .abs_max = 255},
 };
 
-struct ogx360_map {
-    uint8_t axes[6];
-    uint16_t buttons;
-} __packed;
-
-/*static DRAM_ATTR const uint8_t ogx360_axes_idx[ADAPTER_MAX_AXES] =
-{
-//  AXIS_LX, AXIS_LY, AXIS_RX, AXIS_RY, TRIG_L, TRIG_R
-    0,       1,       2,       3,       4,      5
-};*/
-
-//static const uint32_t ogx360_mask[4] = {0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000};
-//static const uint32_t ogx360_desc[4] = {0x110000FF, 0x00000000, 0x00000000, 0x00000000};
-
-static const uint32_t ogx360_mask[4] = {0xBBFF0FFF, 0x00000000, 0x00000000, 0x00000000};
+static const uint32_t ogx360_mask[4] = {0xBBFF0FFF, 0x00000000, 0x00000000, 0x00000000}; //TODO: What do these exactly do?
 static const uint32_t ogx360_desc[4] = {0x110000FF, 0x00000000, 0x00000000, 0x00000000};
 
-
+/*Start ogx360_i2c.c*/
 struct usbd_duke_out_t
 {
+    uint8_t controllerType;
     uint8_t startByte;
     uint8_t bLength;
-    uint16_t wButtons;
-    uint8_t A;
-    uint8_t B;
-    uint8_t X;
-    uint8_t Y;
-    uint8_t BLACK;
-    uint8_t WHITE;
-    uint8_t L;
-    uint8_t R;
-    int16_t leftStickX;
-    int16_t leftStickY;
-    int16_t rightStickX;
-    int16_t rightStickY;
+    uint16_t wButtons; // 
+    uint8_t analogButtons[NUM_ANALOG_BUTTONS];
+    uint8_t axis8[NUM_8BIT_AXIS];
+    uint16_t axis16[NUM_16BIT_AXIS];
 };
 
-struct usbd_duke_in_t
-{
-    uint8_t startByte;
-    uint8_t bLength;
-    uint16_t lValue;
-    uint16_t hValue;
-};
+bool i2c_installed = false;
 
-struct usbd_duke_t
-{
-    struct usbd_duke_in_t in;
-    struct usbd_duke_out_t out;
-};
-
-struct usbd_duke_t data;
-
-
-void IRAM_ATTR ogx360_init_buffer(int32_t dev_mode, struct wired_data *wired_data) {
-    memset(&data,0,sizeof(struct usbd_duke_t));
+void initialize_i2c() {
+    if (!i2c_installed)
+    {
+        i2c_installed = true;
+        int i2c_master_port = 0;
+        i2c_config_t conf = {
+            .mode = I2C_MODE_MASTER,
+            .sda_io_num = 22,
+            .sda_pullup_en = GPIO_PULLUP_ENABLE,
+            .scl_io_num = 21,
+            .scl_pullup_en = GPIO_PULLUP_ENABLE,
+            .master.clk_speed = 100000,
+            .clk_flags = 0,
+        };
+        i2c_param_config(I2C_NUM_0, &conf);
+        i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
+    }
 }
+/*End ogx360_i2c.c*/
 
 void ogx360_meta_init(struct generic_ctrl *ctrl_data) {
     memset((void *)ctrl_data, 0, sizeof(*ctrl_data)*4);
@@ -144,80 +110,51 @@ void ogx360_meta_init(struct generic_ctrl *ctrl_data) {
     }
 }
 
-bool i2c_installed = false;
-
 void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
-
+    initialize_i2c(); //ogx360_i2c.c
+	struct usbd_duke_out_t controllerData = { 0 };
+    
+    controllerData.controllerType = 0xF1;
+    controllerData.startByte = 0;
+    controllerData.bLength = 6; // Always needs to be 6 according to docs
+    
+    for (int i=0;i<BUTTON_MASK_SIZE;i++) // Digital buttons
+    {
+        if (ogx360_digital_btns_mask[i] != -1)
+        {
+            if ((ctrl_data->btns[0].value & BIT(i)) != 0)
+            {
+                controllerData.wButtons |= BIT(ogx360_digital_btns_mask[i]);
+            }
+        }
+    }
+    
+    for (int i=0;i<BUTTON_MASK_SIZE;i++) // Analog buttons
+    {
+        if (ogx360_analog_btns_mask[i] != -1)
+        {
+            bool pressed = (ctrl_data->btns[0].value & BIT(i)) > 0;
+            if (pressed)
+            {
+                controllerData.analogButtons[ogx360_analog_btns_mask[i]] = 0xFF;
+            }
+            else
+            {
+                controllerData.analogButtons[ogx360_analog_btns_mask[i]] = 0x00;
+            }
+        }
+    }
+    
+    for (int i=0;i<NUM_16BIT_AXIS;i++) // 16 bit axis
+    {
+        controllerData.axis16[i] = ctrl_data->axes[i].value;
+    }
 	
-	if (!i2c_installed)
-	{
-		i2c_installed = true;
-		int i2c_master_port = 0;
-		i2c_config_t conf = {
-			.mode = I2C_MODE_MASTER,
-			.sda_io_num = 22,
-			.sda_pullup_en = GPIO_PULLUP_ENABLE,
-			.scl_io_num = 21,
-			.scl_pullup_en = GPIO_PULLUP_ENABLE,
-			.master.clk_speed = 100000,
-			.clk_flags = 0,
-		};
-		i2c_param_config(I2C_NUM_0, &conf);
-		i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
-	}
-	memset(&data,0,sizeof(data));
+    for (int i=0;i<NUM_8BIT_AXIS;i++) // 8 bit axis
+    {
+        controllerData.axis8[i] = ctrl_data->axes[i + NUM_16BIT_AXIS].value;
+    }
 	
-	data.out.startByte = 0xF1;
-	data.out.bLength = sizeof(data.out);
-	if (ctrl_data->btns[0].value & BIT(11)) data.out.wButtons |= BIT(0); // D-Up
-	if (ctrl_data->btns[0].value & BIT(10)) data.out.wButtons |= BIT(1); // D-Down
-	if (ctrl_data->btns[0].value & BIT(8)) data.out.wButtons |= BIT(2);  // D-Left
-	if (ctrl_data->btns[0].value & BIT(9)) data.out.wButtons |= BIT(3);  // D-Right
-	if (ctrl_data->btns[0].value & BIT(20)) data.out.wButtons |= BIT(4); // Start
-	if (ctrl_data->btns[0].value & BIT(21)) data.out.wButtons |= BIT(5); // Back
-	if (ctrl_data->btns[0].value & BIT(27)) data.out.wButtons |= BIT(6); // L Stick Press
-	if (ctrl_data->btns[0].value & BIT(31)) data.out.wButtons |= BIT(7); // R Stick Press
-	data.out.A |= (ctrl_data->btns[0].value & BIT(18)) > 0 ? 0xFF : 0; // A
-	data.out.B |= (ctrl_data->btns[0].value & BIT(17)) > 0 ? 0xFF : 0; // B
-	data.out.X |= (ctrl_data->btns[0].value & BIT(16)) > 0 ? 0xFF : 0; // X
-	data.out.Y |= (ctrl_data->btns[0].value & BIT(19)) > 0 ? 0xFF : 0; // Y
-	data.out.WHITE |= (ctrl_data->btns[0].value & BIT(29)) > 0 ? 0xFF : 0;  // White
-	data.out.BLACK |= (ctrl_data->btns[0].value & BIT(25)) > 0 ? 0xFF : 0;  // Black
-	int ltrigger = -1;
-	for (int i=0;i<ADAPTER_MAX_AXES;i++)
-	{
-		int16_t result = 0;
-		//if (ctrl_data->btns[i].value & (axis_to_btn_mask(0))) {
-			result = ctrl_data->axes[i].value;
-		//}
-		switch(i)
-		{
-			case 0:
-				data.out.leftStickX = result;
-				break;
-			case 1:
-				data.out.leftStickY = result;
-				break;
-			case 2:
-				data.out.rightStickX = result;
-				break;
-			case 3:
-				data.out.rightStickY = result;
-				break;
-			case 4:
-				ltrigger = result;
-				data.out.L = result;
-				break;
-			case 5:			
-				data.out.R = result;
-				break;
-		}
-	}
-	memcpy(wired_data->output, (void *)&data.out, sizeof(data.out));
-	ets_printf("L Trigger: %d\n",ltrigger);
-	i2c_master_write_to_device(I2C_NUM_0, ctrl_data->index+1, (void*)&data.out, sizeof(data.out), 1000);
-}
-
-void ogx360_gen_turbo_mask(struct wired_data *wired_data) {
-	
+    memcpy(wired_data->output, (void *)&controllerData, sizeof(controllerData));
+    i2c_master_write_to_device(I2C_NUM_0, ctrl_data->index+1, (void*)&controllerData, sizeof(controllerData), 1000); //ogx360_i2c.c
 }
