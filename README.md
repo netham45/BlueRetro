@@ -1,3 +1,7 @@
+This is a modified version of BlueRetro with support for sending commands to an OGX360 over I2C. See https://github.com/netham45/ogx360 for a compatible build of ogx360.
+
+This can be compiled the same as BlueRetro. Select the OGX360 options in sdkconfig to build for it. It does not have auto-detection for the ogx360
+
 # BlueRetro
 ![CI](https://github.com/darthcloud/BlueRetro/workflows/CI/badge.svg)
 
