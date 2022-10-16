@@ -1,7 +1,6 @@
 #ifndef _OGX360_H_
 #define _OGX360_H_
 #include <string.h>
-#include "driver/i2c.h"
 #include "adapter/adapter.h"
 #include "adapter/config.h"
 
