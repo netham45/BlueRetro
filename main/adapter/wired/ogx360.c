@@ -48,10 +48,10 @@ static DRAM_ATTR const int ogx360_analog_btns_mask[BUTTON_MASK_SIZE] = {
 
 static DRAM_ATTR const struct ctrl_meta ogx360_axes_meta[ADAPTER_MAX_AXES] =
 {
-    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
-    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
-    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
-    {.size_min = -32253, .size_max = 32253, .neutral = 0x00, .abs_max = 32253},
+    {.size_min = -32768, .size_max = 32767, .neutral = 0x00, .abs_max = 32767},
+    {.size_min = -32768, .size_max = 32767, .neutral = 0x00, .abs_max = 32767},
+    {.size_min = -32768, .size_max = 32767, .neutral = 0x00, .abs_max = 32767},
+    {.size_min = -32768, .size_max = 32767, .neutral = 0x00, .abs_max = 32767},
     {.size_min = 0, .size_max = 255, .neutral = 0x00, .abs_max = 255},
     {.size_min = 0, .size_max = 255, .neutral = 0x00, .abs_max = 255},
 };
@@ -93,7 +93,7 @@ void ogx360_meta_init(struct generic_ctrl *ctrl_data) {
 }
 
 void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {    
-	struct usbd_duke_out duke_out = { 0 }; // ogx360_i2c.c
+    struct usbd_duke_out duke_out = { 0 }; // ogx360_i2c.c
     duke_out.controllerType = 0xF1;
     duke_out.startByte = 0;
     duke_out.bLength = 6; // Always needs to be 6 according to docs
@@ -127,13 +127,30 @@ void ogx360_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struc
     
     for (int i=0;i<NUM_16BIT_AXIS;i++) // 16 bit axis
     {
-        duke_out.axis16[i] = ctrl_data->axes[i].value;
+        if (ctrl_data->axes[i].value > ctrl_data->axes[i].meta->size_max) {
+            duke_out.axis16[i] = ctrl_data->axes[i].meta->size_max;
+        }
+        else if (ctrl_data->axes[i].value < ctrl_data->axes[i].meta->size_min) {
+            duke_out.axis16[i] = ctrl_data->axes[i].meta->size_min;
+        }
+        else {
+            duke_out.axis16[i] = ctrl_data->axes[i].value;
+        }
     }
     
     for (int i=0;i<NUM_8BIT_AXIS;i++) // 8 bit axis
     {
-        duke_out.axis8[i] = ctrl_data->axes[i + NUM_16BIT_AXIS].value;
+        uint8_t axes_index = NUM_16BIT_AXIS + i;
+        if (ctrl_data->axes[axes_index].value > ctrl_data->axes[axes_index].meta->size_max) {
+            duke_out.axis8[i] = ctrl_data->axes[axes_index].meta->size_max;
+        }
+        else if (ctrl_data->axes[axes_index].value < ctrl_data->axes[axes_index].meta->size_min) {
+            duke_out.axis8[i] = ctrl_data->axes[axes_index].meta->size_min;
+        }
+        else {     
+            duke_out.axis8[i] = ctrl_data->axes[axes_index].value;
+        }
     }
     memcpy(wired_data->output, (void *)&duke_out, sizeof(duke_out));
-	ogx360_init(); //Hack
+    ogx360_init(); //Hack
 }
