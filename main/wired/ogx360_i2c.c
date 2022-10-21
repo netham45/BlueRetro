@@ -1,31 +1,22 @@
-#include "ogx360_i2c.h"
-#include "driver/i2c.h"
-#include "adapter/adapter.h"
-#include "adapter/config.h"
-#include <freertos/task.h>
 #include <esp32/rom/ets_sys.h>
+#include "adapter/adapter.h"
+#include "driver/i2c.h"
+#include <soc/i2c_periph.h>
+#include "ogx360_i2c.h"
+#include <string.h>
 
-bool players[4] = {0};
-
-typedef struct __attribute__((packed)) usbd_duke_in
-{
-    uint8_t startByte;
-    uint8_t bLength;
-    uint16_t lValue;
-    uint16_t hValue;
-} usbd_duke_in_t;
+bool playerConnected[4] = {0};
 
 void ogx360_check_connected_controllers()
 {
-    ets_printf("Checking controllers\n");
+    ets_printf("OGX360_I2C: Looking for attached OGX360 modules\n");
     for (int i=0;i<4;i++)
     {
         const char ping[] = { 0xAA };
         esp_err_t result = i2c_master_write_to_device(I2C_NUM_0, i + 1, (void*)ping, sizeof(ping), 150);
-        players[i] = (result == ESP_OK);
-        ets_printf("OGX360_I2C: Player %d %s\n",i,players[i]?"Found":"Not Found");
+        playerConnected[i] = (result == ESP_OK);
+        ets_printf("OGX360_I2C: Player %d %s\n", i, playerConnected[i] ? "Found" : "Not Found");
     }
-    ets_printf("Checking controllers done\n");
 }
 
 void ogx360_initialize_i2c(void) {
@@ -38,33 +29,38 @@ void ogx360_initialize_i2c(void) {
         .master.clk_speed = 400000,
         .clk_flags = 0,
     };
-    ets_printf("ogx360_init_i2c 1\n");
+    ets_printf("OGX360_I2C: Init I2C\n");
     i2c_param_config(I2C_NUM_0, &conf);
-    ets_printf("ogx360_init_i2c 2\n");
     i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
-    ets_printf("ogx360_init_i2c 3\n");
+    I2C0.timeout.tout = 1048575;
+    i2c_set_timeout(I2C_NUM_0, 1048575);
 }
 
 bool initialized = false;
 
-void ogx360_init(void)
+void ogx360_process(uint8_t player)
 {
-    struct usbd_duke_in duke_in = { 0 };
     if (!initialized)
     {
         ogx360_initialize_i2c();
         ogx360_check_connected_controllers();
         initialized = true;
     }
-    
-//    while(1)
+
+//  while(1) // Hack
     {
-        for (int i=0;i<4;i++)
+        //for (int player=0;player<4;player++)
         {
-            if (players[i])
+            if (playerConnected[player])
             {
-                i2c_master_write_to_device(I2C_NUM_0, i + 1, (void*)&wired_adapter.data[i].output, 21, 150);
-                i2c_master_read_from_device(I2C_NUM_0,i + 1, (void*)&duke_in, sizeof(duke_in), 150);
+                esp_err_t result = i2c_master_write_to_device(I2C_NUM_0, player + 1, (void*)&wired_adapter.data[player].output, 21, 1);
+                if (result != ESP_OK) ets_printf("OGX360 write result: %d Index: %d\n",result,player);
+                if (result == 0)
+                {    
+                    memset((void*)&wired_adapter.data[player].output,0,7);
+                    result = i2c_master_read_from_device(I2C_NUM_0,player + 1, (void*)&wired_adapter.data[player].output, 7, 1048575);
+                    if (result != ESP_OK) ets_printf("OGX360 read result: %d Index: %d\n",result,player);
+                }
             }
         }
     }

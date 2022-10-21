@@ -394,6 +394,8 @@ struct generic_fb {
             uint32_t start;
         };
     };
+	uint32_t left_motor;
+	uint32_t right_motor;
 };
 
 struct raw_fb_header {
