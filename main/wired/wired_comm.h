@@ -74,6 +74,10 @@
 #else
 #ifdef CONFIG_BLUERETRO_SYSTEM_OGX360
 #define HARDCODED_SYS OGX360
+#else
+#ifdef CONFIG_BLUERETRO_SYSTEM_GAMEPORT
+#define HARDCODED_SYS GAMEPORT
+#endif
 #endif
 #endif
 #endif

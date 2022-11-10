@@ -132,6 +132,11 @@ menu "BlueRetro"
             bool "OGX360"
             help
                 Select this to support only OGX360
+        
+        config BLUERETRO_SYSTEM_GAMEPORT
+            bool "OGX360"
+            help
+                Select this to support only Gameport
 
     endchoice
 

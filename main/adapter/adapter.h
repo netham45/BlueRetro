@@ -82,6 +82,7 @@ enum {
     PARALLEL_2P_OD,
     SEA_BOARD,
     OGX360,
+	GAMEPORT,
     WIRED_MAX,
 };
 

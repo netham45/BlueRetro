@@ -22,6 +22,7 @@
 #include "sea.h"
 #include "wii.h"
 #include "ogx360.h"
+#include "gameport.h"
 #include "wired.h"
 
 static from_generic_t from_generic_func[WIRED_MAX] = {
@@ -50,6 +51,7 @@ static from_generic_t from_generic_func[WIRED_MAX] = {
     para_2p_from_generic, /* PARALLEL_2P_OD */
     sea_from_generic, /* SEA_BOARD */
     ogx360_from_generic, /* OGX360 */
+	gameport_from_generic, /* GAMEPORT */
 };
 
 static fb_to_generic_t fb_to_generic_func[WIRED_MAX] = {
@@ -78,6 +80,7 @@ static fb_to_generic_t fb_to_generic_func[WIRED_MAX] = {
     NULL, /* PARALLEL_2P_OD */
     NULL, /* SEA_BOARD */
     NULL, /* OGX360 */
+	NULL, /* GAMEPORT */
 };
 
 static meta_init_t meta_init_func[WIRED_MAX] = {
@@ -106,6 +109,7 @@ static meta_init_t meta_init_func[WIRED_MAX] = {
     para_2p_meta_init, /* PARALLEL_2P_OD */
     sea_meta_init, /* SEA_BOARD */
     ogx360_meta_init, /* OGX360 */
+	gameport_meta_init, /* GAMEPORT */
 };
 
 static DRAM_ATTR buffer_init_t buffer_init_func[WIRED_MAX] = {
@@ -134,6 +138,7 @@ static DRAM_ATTR buffer_init_t buffer_init_func[WIRED_MAX] = {
     para_2p_init_buffer, /* PARALLEL_2P_OD */
     sea_init_buffer, /* SEA_BOARD */
     NULL, /* OGX360 */
+	NULL, /* GAMEPORT */
 };
 
 int32_t wired_meta_init(struct generic_ctrl *ctrl_data) {

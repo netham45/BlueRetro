@@ -49,6 +49,7 @@ static const char *sys_name[WIRED_MAX] = {
     "PARALLEL_2P_OD",
     "SEA Board",
     "OGX360",
+	"GAMEPORT",
 };
 
 static const wired_init_t wired_init[WIRED_MAX] = {
@@ -77,6 +78,7 @@ static const wired_init_t wired_init[WIRED_MAX] = {
     parallel_io_init, /* PARALLEL_2P_OD */
     sea_init, /* SEA_BOARD */
     NULL, //ogx360_init, /* OGX360 */
+	NULL, //ogx360_init, /* GAMEPORT */
 };
 
 static const wired_port_cfg_t wired_port_cfg[WIRED_MAX] = {
@@ -105,6 +107,7 @@ static const wired_port_cfg_t wired_port_cfg[WIRED_MAX] = {
     NULL, /* PARALLEL_2P_OD */
     NULL, /* SEA_BOARD */
     NULL, /* OGX360 */
+	NULL, /* GAMEPORT */
 };
 
 void wired_comm_init(void) {
