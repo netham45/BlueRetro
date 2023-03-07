@@ -309,43 +309,47 @@ void IRAM_ATTR adapter_init_buffer(uint8_t wired_id) {
 void adapter_bridge(struct bt_data *bt_data) {
     uint32_t out_mask = 0;
 
-    if (bt_data->pids->type != BT_NONE) {
+    if (bt_data->base.pids->type != BT_NONE) {
         if (wireless_to_generic(bt_data, ctrl_input)) {
             /* Unsupported report */
             return;
         }
 
-        sys_macro_hdl(ctrl_input, &bt_data->flags);
+        sys_macro_hdl(ctrl_input, &bt_data->base.flags[PAD]);
 
 #ifdef CONFIG_BLUERETRO_ADAPTER_INPUT_DBG
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+        printf("{\"log_type\": \"generic_input\"");
+#endif
         adapter_debug_print(ctrl_input);
+#endif
 #ifdef CONFIG_BLUERETRO_ADAPTER_RUMBLE_DBG
         if (ctrl_input->btns[0].value & BIT(PAD_RB_DOWN)) {
             uint8_t tmp = 0;
             adapter_q_fb(&tmp, 1);
         }
 #endif
-#else
         if (wired_adapter.system_id != WIRED_AUTO) {
             if (wired_meta_init(ctrl_output)) {
                 /* Unsupported system */
                 return;
             }
 
-            out_mask = adapter_mapping(&config.in_cfg[bt_data->pids->out_idx]);
+            out_mask = adapter_mapping(&config.in_cfg[bt_data->base.pids->out_idx]);
 
 #ifdef CONFIG_BLUERETRO_ADAPTER_INPUT_MAP_DBG
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+            printf("{\"log_type\": \"mapped_input\"");
+#endif
             adapter_debug_print(&ctrl_output[0]);
-#else
+#endif
             for (uint32_t i = 0; out_mask; i++, out_mask >>= 1) {
                 if (out_mask & 0x1) {
                     ctrl_output[i].index = i;
                     wired_from_generic(config.out_cfg[i].dev_mode, &ctrl_output[i], &wired_adapter.data[i]);
                 }
             }
-#endif /* CONFIG_BLUERETRO_ADAPTER_INPUT_MAP_DBG */
         }
-#endif /* CONFIG_BLUERETRO_ADAPTER_INPUT_DBG */
     }
 }
 
@@ -372,11 +376,11 @@ uint32_t adapter_bridge_fb(struct raw_fb *fb_data, struct bt_data *bt_data) {
     uint32_t ret = 0;
 #ifndef CONFIG_BLUERETRO_ADAPTER_RUMBLE_DBG
     if (wired_adapter.system_id != WIRED_AUTO) {
-        wired_fb_to_generic(config.out_cfg[bt_data->pids->id].dev_mode, fb_data, &fb_input);
+        wired_fb_to_generic(config.out_cfg[bt_data->base.pids->id].dev_mode, fb_data, &fb_input);
 #else
         fb_input.state ^= 0x01;
 #endif
-        if (bt_data->pids->type != BT_NONE) {
+        if (bt_data->base.pids->type != BT_NONE) {
             wireless_fb_from_generic(&fb_input, bt_data);
             ret = 1;
         }
@@ -403,23 +407,15 @@ void adapter_init(void) {
     if (ctrl_output == NULL) {
         printf("# %s ctrl_output alloc fail\n", __FUNCTION__);
     }
-    for (uint32_t i = 0; i < WIRED_MAX_DEV; i++) {
-        wired_adapter.data[i].cnt_mask = heap_caps_malloc(sizeof(uint32_t) * 128, MALLOC_CAP_32BIT);
-        if (wired_adapter.data[i].cnt_mask == NULL) {
-            printf("# %s cnt_mask[%ld] alloc fail\n", __FUNCTION__, i);
+    for (uint32_t i = 0; i < BT_MAX_DEV; i++) {
+        bt_adapter.data[i].raw_src_mappings = heap_caps_malloc(sizeof(struct raw_src_mapping) * REPORT_MAX, MALLOC_CAP_32BIT);
+        if (bt_adapter.data[i].raw_src_mappings == NULL) {
+            printf("# %s bt_adapter.data[%ld].raw_src_mappings alloc fail\n", __FUNCTION__, i);
         }
-    }
-    bt_adapter.data = heap_caps_malloc(sizeof(struct bt_data) * BT_MAX_DEV, MALLOC_CAP_32BIT);
-    if (bt_adapter.data != NULL) {
-        for (uint32_t i = 0; i < BT_MAX_DEV; i++) {
-            bt_adapter.data[i].output = heap_caps_malloc(128, MALLOC_CAP_8BIT);
-            if (bt_adapter.data[i].output == NULL) {
-                printf("# %s bt_adapter.data[%ld].output alloc fail\n", __FUNCTION__, i);
-            }
+        bt_adapter.data[i].reports = heap_caps_malloc(sizeof(struct hid_report) * REPORT_MAX, MALLOC_CAP_32BIT);
+        if (bt_adapter.data[i].reports == NULL) {
+            printf("# %s bt_adapter.data[%ld].reports alloc fail\n", __FUNCTION__, i);
         }
-    }
-    else {
-        printf("# %s bt_adapter.data alloc fail\n", __FUNCTION__);
     }
 
     wired_adapter.input_q_hdl = queue_bss_init(16, sizeof(struct raw_fb));

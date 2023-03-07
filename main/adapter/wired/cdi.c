@@ -374,6 +374,11 @@ void cdi_ctrl_from_generic(struct generic_ctrl *ctrl_data, struct wired_data *wi
     }
 
     memcpy(wired_data->output, (void *)&map_tmp, sizeof(map_tmp) - 8);
+
+#ifdef CONFIG_BLUERETRO_RAW_OUTPUT
+    printf("{\"log_type\": \"wired_output\", \"axes\": [%ld, %ld], \"btns\": %d}\n",
+        raw_axes[cdi_axes_idx[0]], raw_axes[cdi_axes_idx[1]], map_tmp.buttons);
+#endif
 }
 
 static void cdi_mouse_from_generic(struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
@@ -418,7 +423,7 @@ static void cdi_kb_from_generic(struct generic_ctrl *ctrl_data, struct wired_dat
     kbmon_update(ctrl_data->index, ctrl_data);
 }
 
-void cdi_kb_id_to_scancode(uint8_t dev_id, uint8_t type, uint8_t id) {
+void cdi_kb_id_to_scancode(uint32_t dev_id, uint8_t type, uint8_t id) {
     if (id < KBM_MAX) {
         uint8_t kb_buf[3] = {0};
         uint8_t scancode, change = 0;

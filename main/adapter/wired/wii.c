@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, Jacques Gagnon
+ * Copyright (c) 2019-2023, Jacques Gagnon
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -121,6 +121,22 @@ void wii_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct w
         }
     }
 
+    if (dev_mode == DEV_PAD) {
+        /* Wii Classic Pro analogs status is link to digital buttons */
+        if (map_tmp.buttons & BIT(WII_CLASSIC_L)) {
+            map_tmp.axes[wiic_axes_idx[TRIG_L]] = 0x00;
+        }
+        else {
+            map_tmp.axes[wiic_axes_idx[TRIG_L]] = 0xF8;
+        }
+        if (map_tmp.buttons & BIT(WII_CLASSIC_R)) {
+            map_tmp.axes[wiic_axes_idx[TRIG_R]] = 0x00;
+        }
+        else {
+            map_tmp.axes[wiic_axes_idx[TRIG_R]] = 0xF8;
+        }
+    }
+
     for (uint32_t i = 0; i < ADAPTER_MAX_AXES; i++) {
         if (ctrl_data->map_mask[0] & (axis_to_btn_mask(i) & ctrl_data->desc[0])) {
             if (ctrl_data->axes[i].value > ctrl_data->axes[i].meta->size_max) {
@@ -137,6 +153,12 @@ void wii_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct w
     }
 
     memcpy(wired_data->output, (void *)&map_tmp, sizeof(map_tmp));
+
+#ifdef CONFIG_BLUERETRO_RAW_OUTPUT
+    printf("{\"log_type\": \"wired_output\", \"axes\": [%d, %d, %d, %d, %d, %d], \"btns\": %d}\n",
+        map_tmp.axes[wiic_axes_idx[0]], map_tmp.axes[wiic_axes_idx[1]], map_tmp.axes[wiic_axes_idx[2]],
+        map_tmp.axes[wiic_axes_idx[3]], map_tmp.axes[wiic_axes_idx[4]], map_tmp.axes[wiic_axes_idx[5]], map_tmp.buttons);
+#endif
 }
 
 void IRAM_ATTR wii_gen_turbo_mask(struct wired_data *wired_data) {

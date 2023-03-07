@@ -28,6 +28,7 @@ struct hid_fingerprint {
 };
 
 static const struct hid_fingerprint hid_fp[] = {
+#ifndef CONFIG_BLUERETRO_GENERIC_HID_DEBUG
     {
         .dev_type = BT_PS3,
         .dev_subtype = BT_SUBTYPE_DEFAULT,
@@ -58,6 +59,7 @@ static const struct hid_fingerprint hid_fp[] = {
         .fp_len = 12,
         .fp = {0x09, 0x01, 0x01, 0x39, 0x01, 0x30, 0x01, 0x31, 0x01, 0x33, 0x01, 0x34},
     },
+#endif
 };
 
 /* List of usage we don't care about */
@@ -190,6 +192,28 @@ static int32_t hid_report_fingerprint(struct hid_report *report) {
                 case USAGE_GEN_BUTTON:
                     type = PAD;
                     break;
+                case USAGE_GEN_PHYS_INPUT:
+                    if ((report->usages[i].usage >= 0x95 && report->usages[i].usage <= 0x9C) ||
+                         report->usages[i].usage == 0x50 || report->usages[i].usage == 0x70 ||
+                         report->usages[i].usage == 0x7C || report->usages[i].usage == 0xA7) {
+                        /*
+                            0x50: Duration
+                            0x70: Magnitude
+                            0x7C: Loop count
+                            0xA7: Start Delay
+                            0x95: PID Device Control Report
+                            0x96: PID Device Control
+                            0x97: Enable Actuators
+                            0x98: Disable Actuators
+                            0x99: Stop all effects
+                            0x9A: Device Reset
+                            0x9B: Device Pause
+                            0x9C: Device Continue
+                            More info: https://www.usb.org/sites/default/files/hut1_4.pdf#page=213
+                        */
+                        return RUMBLE;
+                    }
+                    break;
                 case 0x0C: /* CONSUMER */
                     if (type == REPORT_NONE) {
                         type = EXTRA;
@@ -211,6 +235,7 @@ static void hid_device_fingerprint(struct hid_report *report, int32_t *type, uin
     switch (hid_report_fingerprint(report)) {
         case KB:
         case MOUSE:
+        case RUMBLE:
             *type = BT_HID_GENERIC;
             *subtype = BT_SUBTYPE_DEFAULT;
             return;
@@ -254,20 +279,28 @@ static void hid_process_report(struct bt_data *bt_data, struct hid_report *wip_r
     if (report_type != REPORT_NONE && bt_data->reports[report_type].id == 0) {
         hid_device_fingerprint(wip_report, &dev_type, &dev_subtype);
         memcpy(&bt_data->reports[report_type], wip_report, sizeof(bt_data->reports[0]));
-        if (bt_data->pids->type <= BT_HID_GENERIC && dev_type > BT_HID_GENERIC) {
-            bt_data->pids->type = dev_type;
-            bt_data->pids->subtype = dev_subtype;
+        if (bt_data->base.pids->type <= BT_HID_GENERIC && dev_type > BT_HID_GENERIC) {
+            bt_type_update(bt_data->base.pids->id, dev_type, dev_subtype);
         }
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+        printf("], \"report_type\": %ld, \"device_type\": %ld, \"device_subtype\": %ld",
+            report_type, dev_type, dev_subtype);
+#else
         printf("rtype: %ld dtype: %ld sub: %ld", report_type, dev_type, dev_subtype);
+#endif
     }
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+    printf("}\n");
+#else
     printf("\n");
+#endif
 }
 
 void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
     struct hid_stack_element hid_stack[HID_STACK_MAX] = {0};
     uint8_t hid_stack_idx = 0;
     uint8_t usage_idx = 0;
-    struct hid_report wip_report;
+    struct hid_report wip_report = {0};
     uint16_t usage_list[REPORT_MAX_USAGE] = {0};
     uint8_t *end = data + len;
     uint8_t *desc = data;
@@ -282,6 +315,14 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
 
     while (desc < end) {
         switch (*desc++) {
+            case 0x00:
+                break;
+            case 0x01:
+                desc++;
+                break;
+            case 0x03:
+                desc += 4;
+                break;
             case HID_GI_USAGE_PAGE: /* 0x05 */
                 hid_stack[hid_stack_idx].usage_page = *desc++;
                 break;
@@ -307,6 +348,9 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
                     usage_list[usage_idx++] = *(uint16_t *)desc;
                 }
                 desc += 2;
+                break;
+            case 0x0D:
+                desc++;
                 break;
             case HID_GI_LOGICAL_MIN(1): /* 0x15 */
                 hid_stack[hid_stack_idx].logical_min = *desc++;
@@ -357,7 +401,10 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
             case HID_GI_REPORT_SIZE: /* 0x75 */
                 hid_stack[hid_stack_idx].report_size = *desc++;
                 break;
+            case 0x7C:
+                break;
             case HID_MI_INPUT: /* 0x81 */
+            case HID_MI_OUTPUT: /* 0x91 */
                 if (!(*desc & 0x01) && hid_stack[hid_stack_idx].usage_page != 0xFF && usage_list[0] != 0xFF && report_usage_idx < REPORT_MAX_USAGE) {
                     if (hid_stack[hid_stack_idx].report_size == 1) {
                         wip_report.usages[report_usage_idx].usage_page = hid_stack[hid_stack_idx].usage_page;
@@ -367,7 +414,20 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
                         wip_report.usages[report_usage_idx].bit_size = hid_stack[hid_stack_idx].report_cnt * hid_stack[hid_stack_idx].report_size;
                         wip_report.usages[report_usage_idx].logical_min = hid_stack[hid_stack_idx].logical_min;
                         wip_report.usages[report_usage_idx].logical_max = hid_stack[hid_stack_idx].logical_max;
-                        printf("%02X%02X %lu %lu ", hid_stack[hid_stack_idx].usage_page, usage_list[0], report_bit_offset, hid_stack[hid_stack_idx].report_cnt * hid_stack[hid_stack_idx].report_size);
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+                        if (report_usage_idx) {
+                            printf(", ");
+                        }
+                        else if (!report_id) {
+                            printf("{\"log_type\": \"parsed_hid_report\", \"report_id\": 1, \"usages\": [");
+                        }
+                        printf("{\"usage_page\": %d, \"usage\": %d, \"bit_offset\": %lu, \"bit_size\": %lu}",
+                            hid_stack[hid_stack_idx].usage_page, usage_list[0], report_bit_offset,
+                            hid_stack[hid_stack_idx].report_cnt * hid_stack[hid_stack_idx].report_size);
+#else
+                        printf("%02X%02X %lu %lu ", hid_stack[hid_stack_idx].usage_page, usage_list[0], report_bit_offset,
+                            hid_stack[hid_stack_idx].report_cnt * hid_stack[hid_stack_idx].report_size);
+#endif
                         report_bit_offset += hid_stack[hid_stack_idx].report_cnt * hid_stack[hid_stack_idx].report_size;
                         ++report_usage_idx;
                     }
@@ -378,21 +438,44 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
                         }
                         for (uint32_t i = 0; report_usage_idx < idx_end; ++i, ++report_usage_idx) {
                             wip_report.usages[report_usage_idx].usage_page = hid_stack[hid_stack_idx].usage_page;
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+                            if (report_usage_idx) {
+                                printf(", ");
+                            }
+                            else if (!report_id) {
+                                printf("{\"log_type\": \"parsed_hid_report\", \"report_id\": 1, \"usages\": [");
+                            }
+                            printf("{\"usage_page\": %d", hid_stack[hid_stack_idx].usage_page);
+#else
                             printf("%02X", hid_stack[hid_stack_idx].usage_page);
+#endif
                             if (usage_idx < 2) {
                                 wip_report.usages[report_usage_idx].usage = usage_list[0];
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+                                printf(", \"usage\": %d", usage_list[0]);
+#else
                                 printf("%02X ", usage_list[0]);
+#endif
                             }
                             else {
                                 wip_report.usages[report_usage_idx].usage = usage_list[i];
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+                                printf(", \"usage\": %d", usage_list[i]);
+#else
                                 printf("%02X ", usage_list[i]);
+#endif
                             }
                             wip_report.usages[report_usage_idx].flags = *desc;
                             wip_report.usages[report_usage_idx].bit_offset = report_bit_offset;
                             wip_report.usages[report_usage_idx].bit_size = hid_stack[hid_stack_idx].report_size;
                             wip_report.usages[report_usage_idx].logical_min = hid_stack[hid_stack_idx].logical_min;
                             wip_report.usages[report_usage_idx].logical_max = hid_stack[hid_stack_idx].logical_max;
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+                            printf(", \"bit_offset\": %lu, \"bit_size\": %lu}",
+                                report_bit_offset, hid_stack[hid_stack_idx].report_size);
+#else
                             printf("%lu %lu, ", report_bit_offset, hid_stack[hid_stack_idx].report_size);
+#endif
                             report_bit_offset += hid_stack[hid_stack_idx].report_size;
                         }
                     }
@@ -415,11 +498,11 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
                 wip_report.id = report_id;
                 report_usage_idx = 0;
                 report_bit_offset = 0;
+#ifdef CONFIG_BLUERETRO_JSON_DBG
+                printf("{\"log_type\": \"parsed_hid_report\", \"report_id\": %d, \"usages\": [", report_id);
+#else
                 printf("# %d ", report_id);
-                break;
-            case HID_MI_OUTPUT: /* 0x91 */
-                usage_idx = 0;
-                desc++;
+#endif
                 break;
             case HID_GI_REPORT_COUNT: /* 0x95 */
                 hid_stack[hid_stack_idx].report_cnt = *desc++;
@@ -437,7 +520,7 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
                     hid_stack_idx++;
                 }
                 else {
-                    printf("%s HID stack overflow\n", __FUNCTION__);
+                    printf("# %s HID stack overflow\n", __FUNCTION__);
                 }
                 break;
             case 0xB1: /* FEATURE */
@@ -453,18 +536,22 @@ void hid_parser(struct bt_data *bt_data, uint8_t *data, uint32_t len) {
                     hid_stack_idx--;
                 }
                 else {
-                    printf("%s HID stack underrun\n", __FUNCTION__);
+                    printf("# %s HID stack underrun\n", __FUNCTION__);
                 }
                 break;
             case HID_MI_COLLECTION_END: /* 0xC0 */
+                break;
+            case 0xFF:
+                desc += 4;
                 break;
             default:
                 printf("# Unknown HID marker: %02X\n", *--desc);
                 return;
         }
     }
-    if (report_cnt == 0) {
+    if (report_cnt == 0 && wip_report.id == 0) {
         report_id = 1;
+        wip_report.id = 1;
     }
     if (report_id) {
         hid_process_report(bt_data, &wip_report, report_bit_offset, report_usage_idx);

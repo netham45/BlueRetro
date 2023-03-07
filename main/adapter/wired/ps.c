@@ -268,6 +268,13 @@ static void ps_ctrl_from_generic(struct generic_ctrl *ctrl_data, struct wired_da
     }
 
     memcpy(wired_data->output, (void *)&map_tmp, sizeof(map_tmp));
+
+#ifdef CONFIG_BLUERETRO_RAW_OUTPUT
+    printf("{\"log_type\": \"wired_output\", \"axes\": [%d, %d, %d, %d], \"btns\": [%d, %d]}\n",
+        map_tmp.axes[ps_axes_idx[0]], map_tmp.axes[ps_axes_idx[1]],
+        map_tmp.axes[ps_axes_idx[2]], map_tmp.axes[ps_axes_idx[3]],
+        map_tmp.buttons, map_tmp.analog_btn);
+#endif
 }
 
 static void ps_mouse_from_generic(struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
@@ -312,7 +319,7 @@ static void ps_kb_from_generic(struct generic_ctrl *ctrl_data, struct wired_data
     kbmon_update(ctrl_data->index, ctrl_data);
 }
 
-void ps_kb_id_to_scancode(uint8_t dev_id, uint8_t type, uint8_t id) {
+void ps_kb_id_to_scancode(uint32_t dev_id, uint8_t type, uint8_t id) {
     uint8_t kb_buf[12] = {0};
     uint8_t scancode = ps_kb_scancode[id];
     uint32_t idx = 0;

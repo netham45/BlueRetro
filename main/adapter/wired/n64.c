@@ -64,13 +64,13 @@ struct n64_kb_map {
     uint8_t bitfield;
 } __packed;
 
-static const uint32_t n64_mask[4] = {0x33DF0FFF, 0x00000000, 0x00000000, 0x00000000};
+static const uint32_t n64_mask[4] = {0x33DFAFFF, 0x00000000, 0x00000000, 0x00000000};
 static const uint32_t n64_desc[4] = {0x0000000F, 0x00000000, 0x00000000, 0x00000000};
 static DRAM_ATTR const uint32_t n64_btns_mask[32] = {
     0, 0, 0, 0,
     BIT(N64_C_LEFT), BIT(N64_C_RIGHT), BIT(N64_C_DOWN), BIT(N64_C_UP),
     BIT(N64_LD_LEFT), BIT(N64_LD_RIGHT), BIT(N64_LD_DOWN), BIT(N64_LD_UP),
-    0, 0, 0, 0,
+    0, BIT(N64_C_RIGHT), 0, BIT(N64_C_UP),
     BIT(N64_B), BIT(N64_C_DOWN), BIT(N64_A), BIT(N64_C_LEFT),
     BIT(N64_START), 0, 0, 0,
     BIT(N64_Z), BIT(N64_L), 0, 0,
@@ -203,10 +203,9 @@ static void n64_acc_toggle_fb(uint32_t wired_id, uint32_t duration_us) {
             fb_data.state = 1;
             adapter_fb_stop_timer_start(wired_id, duration_us);
             wireless_fb_from_generic(&fb_data, bt_data);
-            bt_hid_feedback(device, bt_data->output);
+            bt_hid_feedback(device, bt_data->base.output);
         }
     }
-
 }
 
 static void n64_ctrl_special_action(struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
@@ -225,10 +224,12 @@ static void n64_ctrl_special_action(struct generic_ctrl *ctrl_data, struct wired
                 if (config.out_cfg[ctrl_data->index].acc_mode == ACC_MEM) {
                     config.out_cfg[ctrl_data->index].acc_mode = ACC_RUMBLE;
                     n64_acc_toggle_fb(ctrl_data->index, 250000);
+                    printf("# %s: Set rumble pak\n", __FUNCTION__);
                 }
                 else {
                     config.out_cfg[ctrl_data->index].acc_mode = ACC_MEM;
                     n64_acc_toggle_fb(ctrl_data->index, 75000);
+                    printf("# %s: Set ctrl pak\n", __FUNCTION__);
                 }
             }
         }
@@ -246,6 +247,7 @@ static void n64_ctrl_special_action(struct generic_ctrl *ctrl_data, struct wired
                 atomic_clear_bit(&wired_data->flags, WIRED_WAITING_FOR_RELEASE2);
 
                 config.global_cfg.banksel = (config.global_cfg.banksel + 1) & 0x3;
+                printf("# %s: Set ctrl pak bank to %d\n", __FUNCTION__, config.global_cfg.banksel);
             }
         }
     }
@@ -289,6 +291,11 @@ static void n64_ctrl_from_generic(struct generic_ctrl *ctrl_data, struct wired_d
     }
 
     memcpy(wired_data->output, (void *)&map_tmp, sizeof(map_tmp));
+
+#ifdef CONFIG_BLUERETRO_RAW_OUTPUT
+    printf("{\"log_type\": \"wired_output\", \"axes\": [%d, %d], \"btns\": %d}\n",
+        map_tmp.axes[n64_axes_idx[0]], map_tmp.axes[n64_axes_idx[1]], map_tmp.buttons);
+#endif
 }
 
 static void n64_mouse_from_generic(struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
@@ -339,7 +346,10 @@ static void n64_kb_from_generic(struct generic_ctrl *ctrl_data, struct wired_dat
         }
     }
 
-    if (ctrl_data->map_mask[2] & BIT(KB_HOME & 0x1F)) {
+    /* map_mask is in IRAM but somehow GCC emit an l8ui which crash the ESP32 */
+    /* volatile var force it to use a l32 */
+    volatile uint32_t mask = ctrl_data->map_mask[2];
+    if (mask & BIT(KB_HOME & 0x1F)) {
         if (ctrl_data->btns[2].value & BIT(KB_HOME & 0x1F)) {
             map_tmp.bitfield = 0x01;
         }

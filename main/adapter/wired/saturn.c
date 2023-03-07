@@ -278,6 +278,12 @@ void saturn_ctrl_from_generic(struct generic_ctrl *ctrl_data, struct wired_data 
     }
 
     memcpy(wired_data->output, (void *)&map_tmp, sizeof(map_tmp));
+
+#ifdef CONFIG_BLUERETRO_RAW_OUTPUT
+    printf("{\"log_type\": \"wired_output\", \"axes\": [%d, %d, %d, %d], \"btns\": %d}\n",
+        map_tmp.axes[saturn_axes_idx[0]], map_tmp.axes[saturn_axes_idx[1]],
+        map_tmp.axes[saturn_axes_idx[4]], map_tmp.axes[saturn_axes_idx[5]], map_tmp.buttons);
+#endif
 }
 
 static void saturn_mouse_from_generic(struct generic_ctrl *ctrl_data, struct wired_data *wired_data) {
@@ -338,7 +344,7 @@ static void saturn_kb_from_generic(struct generic_ctrl *ctrl_data, struct wired_
     kbmon_update(ctrl_data->index, ctrl_data);
 }
 
-void saturn_kb_id_to_scancode(uint8_t dev_id, uint8_t type, uint8_t id) {
+void saturn_kb_id_to_scancode(uint32_t dev_id, uint8_t type, uint8_t id) {
     uint8_t kb_buf[2] = {0};
     switch (type) {
         case KBMON_TYPE_MAKE:
