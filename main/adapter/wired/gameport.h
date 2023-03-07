@@ -8,10 +8,21 @@ struct gameport_data {
 	uint8_t axis[4]; //X1 Y1 X2 Y2
 };
 
-struct gameport_kb_data {
+struct gameport_kb_xmit {
 	uint8_t magic;
 	uint8_t key;
 	uint8_t pressed;
+};
+
+
+struct gameport_kb_data {
+	uint8_t magic;
+	uint32_t buttons[4];
+};
+
+struct gameport_kb_button_state {
+	uint8_t pressed;
+	uint32_t player;
 };
 
 void gameport_meta_init(struct generic_ctrl *ctrl_data);
@@ -238,7 +249,18 @@ void gameport_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, str
 // 0xdc  Keypad Decimal
 // 0xdd  Keypad Hexadecimal
 
-#define KEY_LEFTCTRL 0xe0 // Keyboard Left Control
+
+#define KEY_LEFTCTRL 0x81
+#define KEY_LEFTSHIFT 0x82
+#define KEY_LEFTALT 0x84
+#define KEY_LEFTMETA 0x88
+#define KEY_RIGHTCTRL 0x90
+#define KEY_RIGHTSHIFT 0xA0
+#define KEY_RIGHTALT 0xC0
+#define KEY_RIGHTMETA 0x80
+
+
+/*#define KEY_LEFTCTRL 0xe0 // Keyboard Left Control
 #define KEY_LEFTSHIFT 0xe1 // Keyboard Left Shift
 #define KEY_LEFTALT 0xe2 // Keyboard Left Alt
 #define KEY_LEFTMETA 0xe3 // Keyboard Left GUI
@@ -246,6 +268,8 @@ void gameport_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, str
 #define KEY_RIGHTSHIFT 0xe5 // Keyboard Right Shift
 #define KEY_RIGHTALT 0xe6 // Keyboard Right Alt
 #define KEY_RIGHTMETA 0xe7 // Keyboard Right GUI
+#define KEY_LEFTWIN 0x5B
+#define KEY_RIGHTWIN 0x5C*/
 
 #define KEY_MEDIA_PLAYPAUSE 0xe8
 #define KEY_MEDIA_STOPCD 0xe9
@@ -284,6 +308,40 @@ void gameport_from_generic(int32_t dev_mode, struct generic_ctrl *ctrl_data, str
 #define KEY_ARROWHOME KEY_ENTER
 #define CURLYBRACKETS 0
 #define EXCLAMATIONCENT 0
+
+
+static const uint8_t gameport_kb_scancode[KBM_MAX] = {
+ /* KB_A, KB_D, KB_S, KB_W, MOUSE_X_LEFT, MOUSE_X_RIGHT, MOUSE_Y_DOWN MOUSE_Y_UP */
+    KEY_A, KEY_D, KEY_S, KEY_W, 0x00, 0x00, 0x00, 0x00,
+ /* KB_LEFT, KB_RIGHT, KB_DOWN, KB_UP, MOUSE_WX_LEFT, MOUSE_WX_RIGHT, MOUSE_WY_DOWN, MOUSE_WY_UP */
+    KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP, 0x00, 0x00, 0x00, 0x00,
+ /* KB_Q, KB_R, KB_E, KB_F, KB_ESC, KB_ENTER, KB_LWIN, KB_HASH */
+    KEY_Q, KEY_R, KEY_E, KEY_F, KEY_ESC, KEY_ENTER, KEY_LEFTMETA, 0,
+ /* MOUSE_RIGHT, KB_Z, KB_LCTRL, MOUSE_MIDDLE, MOUSE_LEFT, KB_X, KB_LSHIFT, KB_SPACE */
+    0x00, KEY_Z, KEY_LEFTCTRL, 0x00, 0x00, KEY_X, KEY_LEFTSHIFT, KEY_SPACE,
+ /* KB_B, KB_C, KB_G, KB_H, KB_I, KB_J, KB_K, KB_L */
+    KEY_B, KEY_C, KEY_G, KEY_H, KEY_I, KEY_J, KEY_K, KEY_L,
+ /* KB_M, KB_N, KB_O, KB_P, KB_T, KB_U, KB_V, KB_Y */
+    KEY_M, KEY_N, KEY_O, KEY_P, KEY_T, KEY_U, KEY_V, KEY_Y,
+ /* KB_1, KB_2, KB_3, KB_4, KB_5, KB_6, KB_7, KB_8 */
+    KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8,
+ /* KB_9, KB_0, KB_BACKSPACE, KB_TAB, KB_MINUS, KB_EQUAL, KB_LEFTBRACE, KB_RIGHTBRACE */
+    KEY_9, KEY_0, KEY_BACKSPACE, KEY_TAB, KEY_MINUS, KEY_EQUAL, KEY_LEFTBRACE, KEY_RIGHTBRACE,
+ /* KB_BACKSLASH, KB_SEMICOLON, KB_APOSTROPHE, KB_GRAVE, KB_COMMA, KB_DOT, KB_SLASH, KB_CAPSLOCK */
+    KEY_BACKSLASH, KEY_SEMICOLON, KEY_APOSTROPHE, KEY_GRAVE, KEY_COMMA, KEY_DOT, KEY_SLASH, KEY_CAPSLOCK,
+ /* KB_F1, KB_F2, KB_F3, KB_F4, KB_F5, KB_F6, KB_F7, KB_F8 */
+    KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8,
+ /* KB_F9, KB_F10, KB_F11, KB_F12, KB_PSCREEN, KB_SCROLL, KB_PAUSE, KB_INSERT */
+    KEY_F9, KEY_F10, KEY_F11, KEY_F12, KEY_SYSRQ, KEY_SCROLLLOCK, KEY_PAUSE, KEY_INSERT,
+ /* KB_HOME, KB_PAGEUP, KB_DEL, KB_END, KB_PAGEDOWN, KB_NUMLOCK, KB_KP_DIV, KB_KP_MULTI */
+    KEY_HOME, KEY_PAGEUP, KEY_DELETE, KEY_END, KEY_PAGEDOWN, KEY_NUMLOCK, KEY_KPSLASH, KEY_KPASTERISK,
+ /* KB_KP_MINUS, KB_KP_PLUS, KB_KP_ENTER, KB_KP_1, KB_KP_2, KB_KP_3, KB_KP_4, KB_KP_5 */
+    KEY_KPMINUS, KEY_KPPLUS, KEY_KPENTER, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5,
+ /* KB_KP_6, KB_KP_7, KB_KP_8, KB_KP_9, KB_KP_0, KB_KP_DOT, KB_LALT, KB_RCTRL */
+    KEY_KP6, KEY_KP7, KEY_KP8, KEY_KP9, KEY_KP0, KEY_KPDOT, KEY_LEFTALT, KEY_RIGHTCTRL,
+ /* KB_RSHIFT, KB_RALT, KB_RWIN */
+    KEY_RIGHTSHIFT, KEY_RIGHTALT, KEY_RIGHTMETA,
+};
 
 #endif /* _GAMEPORT_H_ */
 

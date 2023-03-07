@@ -346,6 +346,7 @@ void adapter_bridge(struct bt_data *bt_data) {
             for (uint32_t i = 0; out_mask; i++, out_mask >>= 1) {
                 if (out_mask & 0x1) {
                     ctrl_output[i].index = i;
+                    ctrl_output[i].input_index = bt_data->base.pids->out_idx;
                     wired_from_generic(config.out_cfg[i].dev_mode, &ctrl_output[i], &wired_adapter.data[i]);
                 }
             }

@@ -52,6 +52,7 @@
 #define ACK_VAL 0x0                             /*!< I2C ack value */
 #define NACK_VAL 0x1                            /*!< I2C nack value */
 
+struct gameport_kb_button_state buttonStats[256] = { 0 };
 int i2c_master_port = 0;
 
 const uint8_t GAMEPORT_BUTTON_PINS[] = {GAMEPORT_BUTTON_PIN_1, GAMEPORT_BUTTON_PIN_2, GAMEPORT_BUTTON_PIN_3, GAMEPORT_BUTTON_PIN_4};
@@ -152,19 +153,21 @@ static esp_err_t gameport_i2c_master_send(uint8_t message[], int len)
 
 bool gameport_initialized = false;
 
-uint8_t test[] = "kHello World";
-void gameport_process(uint8_t player)
+void gameport_process(uint32_t player, uint32_t controller)
 {
     if (!gameport_initialized)
     {
         gameport_initialize();
         gameport_initialized = true;
     }
-	
 	struct gameport_data *data = (struct gameport_data*)&wired_adapter.data[player].output;
     if (data->magic == 'g')
     {
         struct gameport_spi_data spi_data;
+        for (int i=0;i<4;i++)
+        {
+            gpio_set_level(GAMEPORT_BUTTON_PINS[i], data->buttons[i] ? GAMEPORT_PRESSED : GAMEPORT_RELEASED);
+        }
         for (int i=0;i<4;i++)
         {
             spi_data.address = AXIS_MAP[i];
@@ -182,8 +185,26 @@ void gameport_process(uint8_t player)
     else if(data->magic == 'k')
     {
         struct gameport_kb_data *kb_data = (struct gameport_kb_data*) &wired_adapter.data[player].output;
-        gameport_i2c_master_send(kb_data,sizeof(struct gameport_kb_data));
-    } 
-    
-
+        struct gameport_kb_xmit kb_xmit;
+        kb_xmit.magic = 'k';
+        for (uint32_t i = 0; i < KBM_MAX; i++) {
+            bool pressed = (kb_data->buttons[i / 32]  & BIT(i & 0x1F)) > 0;
+            if (buttonStats[i].pressed != pressed) {
+                if (!buttonStats[i].pressed || controller == buttonStats[i].player)
+                {
+                    kb_xmit.key = gameport_kb_scancode[i];
+                    kb_xmit.pressed = pressed;
+                    buttonStats[i].pressed = pressed;
+                    buttonStats[i].player = controller;
+                    esp_err_t result = -1;
+                    uint8_t retryCount = 10;
+                    ets_printf("Sending key %d %s controller: %d\n",kb_xmit.key,kb_xmit.pressed?"Pressed":"Released", controller);
+                    do {
+                        result = gameport_i2c_master_send((uint8_t*)&kb_xmit,sizeof(struct gameport_kb_xmit));
+                        vTaskDelay(3);
+                    } while (result != 0 && retryCount-- > 0);
+                }
+            }
+        }
+    }
 }

@@ -389,6 +389,7 @@ struct ctrl_btn {
 
 struct generic_ctrl {
     uint32_t index;
+    uint32_t input_index;
     const uint32_t *mask;
     const uint32_t *desc;
     uint32_t map_mask[4];
