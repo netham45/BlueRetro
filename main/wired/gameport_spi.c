@@ -5,6 +5,10 @@
 #include <string.h>
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include <string.h>
+#include "driver/i2c.h"
+
+
 
 #define GAMEPORT_PRESSED 0
 #define GAMEPORT_RELEASED 1
@@ -32,6 +36,23 @@
 #define GAMEPORT_BUTTON_PIN_2 14
 #define GAMEPORT_BUTTON_PIN_3 27
 #define GAMEPORT_BUTTON_PIN_4 13
+
+
+#define I2C_MASTER_SCL_IO 21               /*!< gpio number for I2C master clock */
+#define I2C_MASTER_SDA_IO 22               /*!< gpio number for I2C master data  */
+#define I2C_MASTER_FREQ_HZ 400000        /*!< I2C master clock frequency */
+#define I2C_MASTER_TX_BUF_DISABLE 0                           /*!< I2C master doesn't need buffer */
+#define I2C_MASTER_RX_BUF_DISABLE 0                           /*!< I2C master doesn't need buffer */
+#define SLAVE_ADDRESS 1 
+
+#define WRITE_BIT I2C_MASTER_WRITE              /*!< I2C master write */
+#define READ_BIT I2C_MASTER_READ                /*!< I2C master read */
+#define ACK_CHECK_EN 0x0                        /*!< I2C master will check ack from slave*/
+#define ACK_CHECK_DIS 0x0                       /*!< I2C master will not check ack from slave */
+#define ACK_VAL 0x0                             /*!< I2C ack value */
+#define NACK_VAL 0x1                            /*!< I2C nack value */
+
+int i2c_master_port = 0;
 
 const uint8_t GAMEPORT_BUTTON_PINS[] = {GAMEPORT_BUTTON_PIN_1, GAMEPORT_BUTTON_PIN_2, GAMEPORT_BUTTON_PIN_3, GAMEPORT_BUTTON_PIN_4};
 
@@ -82,6 +103,26 @@ void gameport_initialize(void) {
     assert(ret==ESP_OK);
     ret=spi_bus_add_device(VSPI_HOST, &devcfg, &gameport_spi);
 
+    //Initialize I2C
+        i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = I2C_MASTER_SDA_IO,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = I2C_MASTER_SCL_IO,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        // .clk_flags = 0,          /*!< Optional, you can use I2C_SCLK_SRC_FLAG_* flags to choose i2c source clock here. */
+    };
+    esp_err_t err = i2c_param_config(i2c_master_port, &conf);
+    if (err == ESP_OK) {
+        i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
+    }
+    else
+    {
+        ets_printf("i2c init failed\n");
+    }
+
+
 	//Initialize GPIO
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -93,9 +134,26 @@ void gameport_initialize(void) {
 	gpio_set_level(GAMEPORT_PIN_CS, 1);
 }
 
+static esp_err_t gameport_i2c_master_send(uint8_t message[], int len)
+{
+     
+    esp_err_t ret; 
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, SLAVE_ADDRESS << 1 | WRITE_BIT, ACK_CHECK_EN);
+    i2c_master_write(cmd, message, len, ACK_CHECK_EN);
+    i2c_master_stop(cmd);
+    
+    ret = i2c_master_cmd_begin(i2c_master_port, cmd, 1000 / portTICK_PERIOD_MS);
+    i2c_cmd_link_delete(cmd);
+    return ret;
+}
+
+
 bool gameport_initialized = false;
 
-void gameport_process()
+uint8_t test[] = "kHello World";
+void gameport_process(uint8_t player)
 {
     if (!gameport_initialized)
     {
@@ -103,24 +161,29 @@ void gameport_process()
         gameport_initialized = true;
     }
 	
-	struct gameport_data *data = (struct gameport_data*)&wired_adapter.data[0].output;
-	for (int i=0;i<4;i++)
-	{
-		gpio_set_level(GAMEPORT_BUTTON_PINS[i], data->buttons[i] ? GAMEPORT_PRESSED : GAMEPORT_RELEASED);
-	}
-	
-	struct gameport_spi_data spi_data;
-	for (int i=0;i<4;i++)
-	{
-		spi_data.address = AXIS_MAP[i];
-		if (AXIS_MAP[i] == GAMEPORT_POT_CHANNEL_X1 || AXIS_MAP[i] == GAMEPORT_POT_CHANNEL_X2)
-		{
-			spi_data.value = ((data->axis[i] - 127) * -1) + 128; //TODO: Move to gameport_from_generic
-		}
-		else
-		{
-			spi_data.value = data->axis[i];
-		}
-		gameport_spi_transmit((const uint8_t*)&spi_data,2);
-	}
+	struct gameport_data *data = (struct gameport_data*)&wired_adapter.data[player].output;
+    if (data->magic == 'g')
+    {
+        struct gameport_spi_data spi_data;
+        for (int i=0;i<4;i++)
+        {
+            spi_data.address = AXIS_MAP[i];
+            if (AXIS_MAP[i] == GAMEPORT_POT_CHANNEL_X1 || AXIS_MAP[i] == GAMEPORT_POT_CHANNEL_X2)
+            {
+                spi_data.value = ((data->axis[i] - 127) * -1) + 128; //TODO: Move to gameport_from_generic
+            }
+            else
+            {
+                spi_data.value = data->axis[i];
+            }
+            gameport_spi_transmit((const uint8_t*)&spi_data,2);
+        }
+    }
+    else if(data->magic == 'k')
+    {
+        struct gameport_kb_data *kb_data = (struct gameport_kb_data*) &wired_adapter.data[player].output;
+        gameport_i2c_master_send(kb_data,sizeof(struct gameport_kb_data));
+    } 
+    
+
 }
