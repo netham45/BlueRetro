@@ -452,7 +452,7 @@ static void start_cpu0_default(void)
 #if HAS_ESP_OTA // [refactor-todo] find a better way to handle this.
     // Display information about the current running image.
     if (LOG_LOCAL_LEVEL >= ESP_LOG_INFO) {
-        const esp_app_desc_t *app_desc = esp_ota_get_app_description();
+        const esp_app_desc_t *app_desc = esp_app_get_description();
         ESP_EARLY_LOGI(TAG, "Application information:");
 #ifndef CONFIG_APP_EXCLUDE_PROJECT_NAME_VAR
         ESP_EARLY_LOGI(TAG, "Project name:     %s", app_desc->project_name);
@@ -467,7 +467,7 @@ static void start_cpu0_default(void)
         ESP_EARLY_LOGI(TAG, "Compile time:     %s %s", app_desc->date, app_desc->time);
 #endif
         char buf[17];
-        esp_ota_get_app_elf_sha256(buf, sizeof(buf));
+        esp_app_get_elf_sha256(buf, sizeof(buf));
         ESP_EARLY_LOGI(TAG, "ELF file SHA256:  %s...", buf);
         ESP_EARLY_LOGI(TAG, "ESP-IDF:          %s", app_desc->idf_ver);
     }
