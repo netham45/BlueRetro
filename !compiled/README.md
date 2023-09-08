@@ -55,6 +55,10 @@ Connect right side pin22 (SCL) from Esp32 with Arduinos pin8 (D2).
 
 Connect right side pin21 (SDA) from Esp32 with Arduinos pin7 (D3).
 
+Connect Your arduino to xbox with Xbox Controller Port to MicroUSB cable.
+
+
+
 
 
 <img src="./Images/Esp32 pinouts.jpg" alt="flash2"/>  
@@ -92,6 +96,8 @@ I have made some trick, and suprising - it works.
 On Arduino :take out cable from pin1 (RAW), and connect to pin4(Vcc).
 
 ON esp32 : take out  cable from bottom left pin5V and connect it to top left pin 3V3.
+
+In this configuration Esp32 need to be powered up over MicroUSB socket.
 
 Now everything will be powered from Esp32 board over usb socket, onboard LDO lowers 5V to 3,3V - powering esp32 and over pin3v3 - Arduino/s 
 
