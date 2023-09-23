@@ -1,5 +1,5 @@
 "Ready to go files"  for people who got problems with compilators, IDF etc(I know how annoying this could be), under Windows.
-Just download prepared files for arduino and esp32 from Blueretro and OGX360 folders(Use "Download raw file" option).
+Just go to releases and download "Blueretro+Ogx360 *.zip" file.
 ## ESP32  part :
 I am using esp32-wroom32d DevkitC V4. 
 Dowload [flash download tool](https://www.espressif.com/sites/default/files/tools/flash_download_tool_3.9.5.zip) 
