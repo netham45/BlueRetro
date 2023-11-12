@@ -43,7 +43,7 @@ void ogx360_process(uint8_t player)
 {
     if (!initialized)
     {
-        ogx360_initialize_i2c();
+        ogx360_i2c_init();
         ogx360_check_connected_controllers();
         initialized = true;
     }
